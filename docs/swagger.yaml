@@ -1,0 +1,105 @@
+basePath: /
+definitions:
+  health.StatusResponse:
+    properties:
+      environment:
+        example: development
+        type: string
+      services:
+        additionalProperties:
+          type: string
+        type: object
+      status:
+        example: healthy
+        type: string
+      timestamp:
+        example: "2026-11-05T06:30:00Z"
+        type: string
+      uptime:
+        example: 1h 23m 45s
+        type: string
+      version:
+        example: 1.0.0
+        type: string
+    type: object
+  response.ErrorDetail:
+    properties:
+      field:
+        example: email
+        type: string
+      issue:
+        example: formato de correo inválido
+        type: string
+    type: object
+  response.ErrorInfo:
+    properties:
+      code:
+        example: INTERNAL_SERVER_ERROR
+        type: string
+      details:
+        items:
+          $ref: '#/definitions/response.ErrorDetail'
+        type: array
+      message:
+        example: Ha ocurrido un error inesperado.
+        type: string
+    type: object
+  response.Response:
+    properties:
+      data: {}
+      error:
+        $ref: '#/definitions/response.ErrorInfo'
+      success:
+        example: true
+        type: boolean
+    type: object
+info:
+  contact:
+    name: Equipo de Desarrollo Save My Date
+  description: API backend robusta, segura y escalable para la plataforma Save My
+    Date.
+  title: Save My Date Backend API
+  version: "1.0"
+paths:
+  /api/v1/health:
+    get:
+      description: Retorna el estado operativo de la API, versión, tiempo activo y
+        componentes auxiliares.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/health.StatusResponse'
+              type: object
+      summary: Comprobación del estado del servicio
+      tags:
+      - Health
+  /health:
+    get:
+      description: Retorna el estado operativo de la API, versión, tiempo activo y
+        componentes auxiliares.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/health.StatusResponse'
+              type: object
+      summary: Comprobación del estado del servicio
+      tags:
+      - Health
+schemes:
+- http
+- https
+swagger: "2.0"
