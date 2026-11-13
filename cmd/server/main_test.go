@@ -13,11 +13,11 @@ func TestSetupRouterEndpoints(t *testing.T) {
 		Port:           "8080",
 		Environment:    "testing",
 		AppName:        "save-my-date-test",
-		AppVersion:     "1.0.0",
+		AppVersion:     "1.1",
 		AllowedOrigins: []string{"*"},
 	}
 
-	router := setupRouter(cfg)
+	router := setupRouter(cfg, nil)
 
 	tests := []struct {
 		name           string

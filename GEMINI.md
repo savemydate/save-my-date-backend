@@ -32,14 +32,18 @@ save-my-date-backend/
 │   └── swagger.yaml
 ├── internal/                    # Código privado de la aplicación (no exportable)
 │   ├── domain/                  # Entidades de negocio puras, modelos e interfaces de repositorios
+│   │   └── event.go
 │   ├── handlers/                # Capa de presentación (controladores HTTP / REST)
-│   │   ├── health/
-│   │   └── middleware/          # CORS, Rate Limiting, Logger, Recovery, Auth
+│   │   ├── event/               # Endpoints REST para Eventos
+│   │   ├── health/              # Health check con validación de ping a BD
+│   │   └── middleware/          # CORS, Rate Limiting, Logger, Recovery, Security
 │   ├── service/                 # Casos de uso / lógica de negocio central
-│   ├── repository/              # Acceso a datos (PostgreSQL, MySQL, MongoDB, Redis)
-│   │   ├── postgres/
-│   │   └── redis/
-│   └── platform/                # Inicializadores de infraestructura (DB pool, logger, router)
+│   │   └── event_service.go
+│   ├── repository/              # Acceso a datos y persistencia
+│   │   └── mongodb/             # Implementación de repositorios con driver MongoDB v2
+│   │       └── event_repository.go
+│   └── platform/                # Inicializadores de infraestructura y pools
+│       └── mongodb/             # Cliente de conexión, pool y ping para MongoDB Atlas
 ├── pkg/                         # Paquetes utilitarios reutilizables y exportables (si aplica)
 │   └── response/                # Formateo unificado de respuestas HTTP (éxito y errores)
 ├── .env.example                 # Plantilla de variables de entorno (sin credenciales reales)
@@ -242,37 +246,57 @@ save-my-date-backend/
 ### 10.1. Especificaciones Técnicas Activas
 - **Módulo Go:** `github.com/jomir/save-my-date-backend` (Go 1.27.3+)
 - **Framework Web:** Gin (`github.com/gin-gonic/gin v1.12.0`)
+- **Driver de Base de Datos:** MongoDB Go Driver v2 (`go.mongodb.org/mongo-driver/v2 v2.5.0`)
 - **Documentación Swagger:** `swaggo/swag v1.16.6`, `swaggo/gin-swagger v1.6.1`, `swaggo/files v1.0.1`
 - **Configuración:** `config/config.go` utilizando `joho/godotenv v1.5.1` y variables de entorno (`.env`).
 - **Puerto por defecto:** `:8080`
+- **Base de Datos Configurada:** MongoDB (`save_my_date` en MongoDB Atlas / integración Vercel).
 
 ### 10.2. Componentes y Módulos Implementados
-1. **Punto de Entrada (`cmd/server/main.go`):**
-   - Función desacoplada `setupRouter(cfg)` para pruebas y servidor.
-   - Graceful shutdown ante señales `SIGINT` / `SIGTERM` con timeout de 10s.
-   - Configuración de `http.Server` con timeouts defensivos (Read: 15s, Write: 15s, Idle: 60s).
+1. **Punto de Entrada & Wiring (`cmd/server/main.go`):**
+   - Inicialización del pool de conexiones a MongoDB con timeout configurable.
+   - Inyección de dependencias completa: `platform/mongodb` $\to$ `repository/mongodb` $\to$ `service` $\to$ `handlers`.
+   - Función `setupRouter(cfg, mongoClient)` con soporte desacoplado para tests unitarios (permite `mongoClient = nil`).
+   - Graceful shutdown ante señales `SIGINT` / `SIGTERM` con cierre ordenado tanto del servidor HTTP como del cliente MongoDB.
    - Logger `log/slog` (JSON en producción, Texto en desarrollo).
-2. **Middlewares (`internal/handlers/middleware/`):**
-   - `CORS`: Orígenes parametrizables (`ALLOWED_ORIGINS`), credenciales, cabeceras y pre-flights.
-   - `SecurityHeaders`: Cabeceras OWASP (`nosniff`, `DENY`, `strict-origin-when-cross-origin`, `HSTS` en prod). Excluye CSP restrictivo de `/swagger/*` para renderizado correcto.
-   - `RequestLogger`: Inyección/propagación de `X-Request-ID`, cálculo de latencia en milisegundos y logging estructurado.
-3. **Manejador de Respuestas (`pkg/response/response.go`):**
-   - Estructura unificada: `Response{Success, Data, Error}`.
-   - Detalle de errores con código y lista de campos inválidos (`ErrorDetail`).
-4. **Health Check (`internal/handlers/health/health.go`):**
-   - Retorna: `status`, `version`, `environment`, `timestamp`, `uptime`, y mapa `services`.
-   - Expuesto en: `GET /health` y `GET /api/v1/health`.
-5. **Documentación Swagger (`docs/`):**
-   - Spec OpenAPI en `docs/swagger.json` y `docs/swagger.yaml`.
-   - UI interactiva accesible en `GET /swagger/index.html`.
+2. **Infraestructura de Base de Datos (`internal/platform/mongodb/client.go`):**
+   - Cliente singleton con pool de conexiones gestionado (`MaxPoolSize: 50`, `MinPoolSize: 5`, `MaxConnIdleTime: 5m`).
+   - Validación de conectividad en arranque mediante `Ping` primario con timeout defensivo.
+   - Método `Close(ctx)` para desconexión limpia sin pérdida de transacciones en vuelo.
+3. **Dominio de Eventos (`internal/domain/event.go`):**
+   - Structs tipados completos: `Event`, `CoupleConfig`, `DateConfig`, `LocationsConfig`, `LocationInfo`, `DressCodeConfig`, `GiftRegistryConfig`, `BankAccountInfo`, `AudioConfig`.
+   - Etiquetas duales `bson` y `json` con soporte para campos opcionales (`omitempty`).
+   - Definición del contrato `EventRepository` (`FindAll`, `FindByID`, `FindFirst`).
+4. **Repositorio MongoDB (`internal/repository/mongodb/event_repository.go`):**
+   - Implementa `domain.EventRepository` sobre la colección `events`.
+   - Decodificación BSON resiliente con compatibilidad dual para identificadores: soporta `_id` como `bson.ObjectID` hexadecimal nativo de MongoDB Atlas o como `string` personalizado sin errores de casteo.
+   - Consultas con filtros BSON dinámicos y manejo de cursores (`cursor.All`) con cierre garantizado (`defer cursor.Close`).
+5. **Capa de Servicio de Negocio (`internal/service/event_service.go`):**
+   - Casos de uso: `GetAll`, `GetByID`, `GetActiveEvent`.
+   - Errores centinela de dominio: `ErrEventNotFound` y `ErrInvalidID`.
+   - Validación de parámetros de entrada antes de consultar la persistencia.
+6. **Capa de Controladores HTTP (`internal/handlers/event/handler.go`):**
+   - Endpoints REST implementados:
+     - `GET /api/v1/events`: Listado completo de eventos.
+     - `GET /api/v1/events/active`: Consulta del evento principal para renderizar la invitación web.
+     - `GET /api/v1/events/:id`: Detalle de evento por ID o Mongo ObjectId.
+   - Formateo estandarizado mediante `pkg/response` (`response.OK`, `response.Error`).
+   - Anotaciones Swaggo para autogeneración de OpenAPI.
+7. **Health Check con Ping a Base de Datos (`internal/handlers/health/health.go`):**
+   - Monitoreo en vivo de conectividad con MongoDB.
+   - Reporta estado de dependencias: `"services": {"api": "operational", "database": "operational"|"degraded"}`.
+   - Endpoints: `GET /health` y `GET /api/v1/health`.
+8. **Documentación Swagger (`docs/`):**
+   - UI interactiva en `GET /swagger/index.html`.
    - Redirección automática de la raíz `GET /` $\to$ `/swagger/index.html`.
-6. **Pruebas Automatizadas:**
-   - `internal/handlers/health/health_test.go`: Valida DTO de salud y estado HTTP 200.
-   - `cmd/server/main_test.go`: Valida integración de todas las rutas (`/`, `/health`, `/api/v1/health`, `/swagger/index.html`, `/swagger/doc.json`).
+9. **Pruebas Automatizadas:**
+   - `internal/handlers/health/health_test.go`: Pruebas de salud con mocks para estados operacional y degradado de base de datos.
+   - `cmd/server/main_test.go`: Valida integración de endpoints y middlewares sin requerir base de datos física activa.
 
 ### 10.3. Próximos Pasos en el Roadmap
-- Definición de entidades de dominio en `internal/domain/`.
-- Conexión a base de datos relacional (PostgreSQL) con pool de conexiones y migraciones.
-- Conexión a Redis para caché y rate limiting distribuido.
-- Implementación de casos de uso en `internal/service/` y persistencia en `internal/repository/`.
+- Integración de la colección de confirmaciones de asistencia (`rsvps`):
+  - Modelo de dominio `RSVP` en `internal/domain/rsvp.go`.
+  - Endpoint de registro de confirmación `POST /api/v1/rsvp`.
+  - Endpoints de consulta y filtrado para el panel de administración `GET /api/v1/rsvps` y métricas `GET /api/v1/rsvps/stats`.
+- Autenticación y protección de endpoints administrativos (JWT o API Key).
 

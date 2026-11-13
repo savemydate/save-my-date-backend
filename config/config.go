@@ -18,6 +18,8 @@ type Config struct {
 	AllowedOrigins []string
 	RateLimitRPS   int
 	RateLimitBurst int
+	MongoURI       string //URI de la conexion (Comienza por "mongodb+srv://...")
+	MongoDBName    string // Nombre de la BD
 }
 
 // Load carga las variables de entorno desde .env o el entorno del sistema.
@@ -35,6 +37,8 @@ func Load() (*Config, error) {
 		AllowedOrigins: parseSlice(getEnv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:8080,http://localhost:4200")),
 		RateLimitRPS:   getEnvAsInt("RATE_LIMIT_RPS", 100),
 		RateLimitBurst: getEnvAsInt("RATE_LIMIT_BURST", 200),
+		MongoURI:       getEnv("MONGODB_URI", "mongodb://localhost:27017"),
+		MongoDBName:    getEnv("MONGODB_DATABASE_NAME", "test-project"),
 	}
 
 	return cfg, nil
