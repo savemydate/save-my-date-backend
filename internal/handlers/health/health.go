@@ -1,6 +1,7 @@
 package health
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -9,6 +10,9 @@ import (
 )
 
 var startTime = time.Now()
+
+// Pinger define la función mínima para validar la salud de una base de datos
+type Pinger func(ctx context.Context) error
 
 // StatusResponse representa la estructura de datos del estado operativo.
 type StatusResponse struct {
@@ -24,13 +28,15 @@ type StatusResponse struct {
 type Handler struct {
 	version     string
 	environment string
+	dbPinger    Pinger
 }
 
 // NewHandler crea una nueva instancia del Handler de salud.
-func NewHandler(version, environment string) *Handler {
+func NewHandler(version, environment string, dbPinger Pinger) *Handler {
 	return &Handler{
 		version:     version,
 		environment: environment,
+		dbPinger:    dbPinger,
 	}
 }
 
@@ -45,6 +51,13 @@ func NewHandler(version, environment string) *Handler {
 func (h *Handler) Check(c *gin.Context) {
 	uptimeDuration := time.Since(startTime).Round(time.Second)
 
+	dbStatus := "operational"
+	if h.dbPinger != nil {
+		if err := h.dbPinger(c.Request.Context()); err != nil {
+			dbStatus = "degraded"
+		}
+	}
+
 	status := StatusResponse{
 		Status:      "healthy",
 		Version:     h.version,
@@ -52,7 +65,8 @@ func (h *Handler) Check(c *gin.Context) {
 		Timestamp:   time.Now().UTC(),
 		Uptime:      formatDuration(uptimeDuration),
 		Services: map[string]string{
-			"api": "operational",
+			"api":      "operational",
+			"database": dbStatus,
 		},
 	}
 

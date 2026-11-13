@@ -17,6 +17,150 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/v1/events": {
+            "get": {
+                "description": "Obtiene la lista de todos los eventos configurados en la plataforma",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Listar eventos",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/domain.Event"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/events/active": {
+            "get": {
+                "description": "Retorna la configuración del evento principal para renderizar la invitación web pública.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Obtener evento activo principal",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/domain.Event"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/events/{id}": {
+            "get": {
+                "description": "Retorna los detalles completos de un evento según su identificador único.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Events"
+                ],
+                "summary": "Consultar evento por ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del Evento o Mongo ObjectID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/domain.Event"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/health": {
             "get": {
                 "description": "Retorna el estado operativo de la API, versión, tiempo activo y componentes auxiliares.",
@@ -83,6 +227,176 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "domain.AudioConfig": {
+            "type": "object",
+            "properties": {
+                "src": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.BankAccountInfo": {
+            "type": "object",
+            "properties": {
+                "accountHolder": {
+                    "type": "string"
+                },
+                "accountNumber": {
+                    "type": "string"
+                },
+                "bank": {
+                    "type": "string"
+                },
+                "clabe": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.DateConfig": {
+            "type": "object",
+            "properties": {
+                "display": {
+                    "type": "string"
+                },
+                "iso": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.DressCodeConfig": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "paletteNotes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.Event": {
+            "type": "object",
+            "properties": {
+                "audio": {
+                    "$ref": "#/definitions/domain.AudioConfig"
+                },
+                "date": {
+                    "$ref": "#/definitions/domain.DateConfig"
+                },
+                "dressCode": {
+                    "$ref": "#/definitions/domain.DressCodeConfig"
+                },
+                "giftRegistry": {
+                    "$ref": "#/definitions/domain.GiftRegistryConfig"
+                },
+                "hosts": {
+                    "$ref": "#/definitions/domain.HostsConfig"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "locations": {
+                    "$ref": "#/definitions/domain.LocationsConfig"
+                }
+            }
+        },
+        "domain.GiftRegistryConfig": {
+            "type": "object",
+            "properties": {
+                "bankAccount": {
+                    "$ref": "#/definitions/domain.BankAccountInfo"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "stores": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/domain.GiftRegistryStore"
+                    }
+                }
+            }
+        },
+        "domain.GiftRegistryStore": {
+            "type": "object",
+            "properties": {
+                "eventNumber": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.HostsConfig": {
+            "type": "object",
+            "properties": {
+                "bride": {
+                    "type": "string"
+                },
+                "groom": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "welcomeWords": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "domain.LocationInfo": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "googleMapsUrl": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "string"
+                },
+                "wazeUrl": {
+                    "type": "string"
+                }
+            }
+        },
+        "domain.LocationsConfig": {
+            "type": "object",
+            "properties": {
+                "ceremony": {
+                    "$ref": "#/definitions/domain.LocationInfo"
+                },
+                "reception": {
+                    "$ref": "#/definitions/domain.LocationInfo"
+                }
+            }
+        },
         "health.StatusResponse": {
             "type": "object",
             "properties": {
@@ -164,7 +478,7 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
+	Version:          "1.1",
 	Host:             "",
 	BasePath:         "/",
 	Schemes:          []string{"http", "https"},

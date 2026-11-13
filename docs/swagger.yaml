@@ -1,5 +1,115 @@
 basePath: /
 definitions:
+  domain.AudioConfig:
+    properties:
+      src:
+        type: string
+      title:
+        type: string
+    type: object
+  domain.BankAccountInfo:
+    properties:
+      accountHolder:
+        type: string
+      accountNumber:
+        type: string
+      bank:
+        type: string
+      clabe:
+        type: string
+    type: object
+  domain.DateConfig:
+    properties:
+      display:
+        type: string
+      iso:
+        type: string
+      time:
+        type: string
+    type: object
+  domain.DressCodeConfig:
+    properties:
+      description:
+        type: string
+      paletteNotes:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    type: object
+  domain.Event:
+    properties:
+      audio:
+        $ref: '#/definitions/domain.AudioConfig'
+      date:
+        $ref: '#/definitions/domain.DateConfig'
+      dressCode:
+        $ref: '#/definitions/domain.DressCodeConfig'
+      giftRegistry:
+        $ref: '#/definitions/domain.GiftRegistryConfig'
+      hosts:
+        $ref: '#/definitions/domain.HostsConfig'
+      id:
+        type: string
+      locations:
+        $ref: '#/definitions/domain.LocationsConfig'
+    type: object
+  domain.GiftRegistryConfig:
+    properties:
+      bankAccount:
+        $ref: '#/definitions/domain.BankAccountInfo'
+      message:
+        type: string
+      stores:
+        items:
+          $ref: '#/definitions/domain.GiftRegistryStore'
+        type: array
+    type: object
+  domain.GiftRegistryStore:
+    properties:
+      eventNumber:
+        type: string
+      name:
+        type: string
+      url:
+        type: string
+    type: object
+  domain.HostsConfig:
+    properties:
+      bride:
+        type: string
+      groom:
+        type: string
+      title:
+        type: string
+      welcomeWords:
+        items:
+          type: string
+        type: array
+    type: object
+  domain.LocationInfo:
+    properties:
+      address:
+        type: string
+      googleMapsUrl:
+        type: string
+      name:
+        type: string
+      notes:
+        type: string
+      time:
+        type: string
+      wazeUrl:
+        type: string
+    type: object
+  domain.LocationsConfig:
+    properties:
+      ceremony:
+        $ref: '#/definitions/domain.LocationInfo'
+      reception:
+        $ref: '#/definitions/domain.LocationInfo'
+    type: object
   health.StatusResponse:
     properties:
       environment:
@@ -59,8 +169,96 @@ info:
   description: API backend robusta, segura y escalable para la plataforma Save My
     Date.
   title: Save My Date Backend API
-  version: "1.0"
+  version: "1.1"
 paths:
+  /api/v1/events:
+    get:
+      description: Obtiene la lista de todos los eventos configurados en la plataforma
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/domain.Event'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Listar eventos
+      tags:
+      - Events
+  /api/v1/events/{id}:
+    get:
+      description: Retorna los detalles completos de un evento según su identificador
+        único.
+      parameters:
+      - description: ID del Evento o Mongo ObjectID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/domain.Event'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Consultar evento por ID
+      tags:
+      - Events
+  /api/v1/events/active:
+    get:
+      description: Retorna la configuración del evento principal para renderizar la
+        invitación web pública.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/domain.Event'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Obtener evento activo principal
+      tags:
+      - Events
   /api/v1/health:
     get:
       description: Retorna el estado operativo de la API, versión, tiempo activo y
